@@ -99,7 +99,9 @@ export function ChatWidget() {
     setDraft('')
     append('user', text)
     if (!state.tcpa_consent_granted) {
-      if (isTcpaAgreement(text) && tcpaPending.current) {
+      // The disclosure invites typing "I AGREE" and stays visible while the phone
+      // step is next, so honor it even if no phone number was volunteered first.
+      if (isTcpaAgreement(text) && (tcpaPending.current || needsTcpa)) {
         tcpaPending.current = false
         grantTcpaConsent()
         await say('Thank you for your consent. Please share your cell phone number.')
