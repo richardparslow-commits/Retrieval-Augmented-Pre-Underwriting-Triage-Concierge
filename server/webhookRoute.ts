@@ -1,5 +1,7 @@
 export interface LeadPayload {
   consented: true
+  tcpa_consent_granted: boolean
+  consent_timestamp: string
   fullName: string
   email: string
   cellPhone: string
@@ -20,15 +22,27 @@ export interface LeadPayload {
   cancerFreeDuration: string
 }
 
+function isValidIsoTimestamp(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value)
+  if (!match || !Number.isFinite(Date.parse(value))) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1]
+}
+
 function isLeadPayload(value: unknown): value is LeadPayload {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const payload = value as Partial<LeadPayload>
   const stringFields: (keyof LeadPayload)[] = [
-    'fullName', 'email', 'cellPhone', 'textMessagePreference', 'dateOfBirth', 'gender',
+    'consent_timestamp', 'fullName', 'email', 'cellPhone', 'textMessagePreference', 'dateOfBirth', 'gender',
     'height', 'weight', 'tobaccoNicotineVaping', 'policyType', 'coverageAmount',
     'diabetesType', 'diabetesTreatment', 'lastA1C', 'cancerType', 'cancerFreeDuration',
   ]
   return payload.consented === true &&
+    typeof payload.tcpa_consent_granted === 'boolean' &&
     typeof payload.hasDiabetes === 'boolean' &&
     typeof payload.hasCancer === 'boolean' &&
     stringFields.every((field) => typeof payload[field] === 'string' && payload[field]!.length <= 200) &&
@@ -36,6 +50,10 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) &&
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
+    (payload.cellPhone.length === 0 ||
+      (payload.tcpa_consent_granted === true &&
+        typeof payload.consent_timestamp === 'string' &&
+        isValidIsoTimestamp(payload.consent_timestamp))) &&
     (payload.policyType === '' || payload.policyType === 'Term' || payload.policyType === 'Whole Life' || payload.policyType === 'IUL') &&
     (payload.textMessagePreference === '' || payload.textMessagePreference === 'yes' || payload.textMessagePreference === 'no')
 }
@@ -73,6 +91,8 @@ export async function handleWebhookRequest(request: Request): Promise<Response> 
       headers: { 'Content-Type': 'application/json', Authorization: ['Bearer', secret].join(' ') },
       body: JSON.stringify({
         consented: payload.consented,
+        tcpa_consent_granted: payload.tcpa_consent_granted,
+        consent_timestamp: payload.consent_timestamp,
         fullName: payload.fullName,
         email: payload.email,
         cellPhone: payload.cellPhone,

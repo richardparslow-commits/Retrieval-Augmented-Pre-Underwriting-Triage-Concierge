@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
 import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, type ChatMessage } from './ChatAPI'
 import { useUnderwritingState } from './useUnderwritingState'
@@ -8,6 +8,7 @@ interface DisplayMessage extends ChatMessage {
 }
 
 const schedulingUrl = import.meta.env.VITE_SCHEDULING_URL || 'https://calendly.com/'
+const tcpaDisclosure = "To text or call you with updates about your life insurance inquiry, I need your permission. By replying 'I AGREE', you provide prior express written consent for Life Insurance Broker Advocate to contact you via SMS and phone calls, including using automated technology. Consent is not a condition of purchase. Message/data rates apply."
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -20,13 +21,23 @@ export function ChatWidget() {
     role: 'assistant',
     content: 'Hi! I can explain Term, Whole Life, and IUL in plain language. I can also help organize preliminary information for a licensed professional—no binding quotes or approval guarantees. What would you like to learn?',
   }])
-  const { state, updateFromMessage, requestConsent, missingFields, skipCurrent } = useUnderwritingState()
+  const {
+    state,
+    updateFromMessage,
+    requestConsent,
+    tcpaConsentPending,
+    requestTcpaConsent,
+    grantTcpaConsent,
+    missingFields,
+    skipCurrent,
+  } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const summary = [
     ['Name', state.fullName],
     ['Email', state.email],
     ['Cell phone', state.cellPhone],
+    ['TCPA consent', state.tcpaConsentGranted ? `granted at ${state.tcpaConsentTimestamp}` : 'not granted'],
     ['Text messages', state.textMessagePreference],
     ['Date of birth', state.dateOfBirth],
     ['Gender', state.gender],
@@ -39,10 +50,23 @@ export function ChatWidget() {
     ['Cancer', state.hasCancer ? [state.cancerType, state.cancerFreeDuration].filter(Boolean).join(', ') || 'Mentioned; details not provided' : ''],
   ].filter(([, value]) => value)
 
-  function append(role: ChatMessage['role'], content: string) {
+  const append = useCallback((role: ChatMessage['role'], content: string) => {
     setMessages((current) => [...current, { id: nextId.current++, role, content }])
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }))
-  }
+  }, [])
+
+  const firstMissingField = missingFields[0]
+  useEffect(() => {
+    if (
+      state.consented &&
+      firstMissingField === 'your cell phone number' &&
+      !state.tcpaConsentGranted &&
+      !tcpaConsentPending
+    ) {
+      requestTcpaConsent()
+      append('assistant', tcpaDisclosure)
+    }
+  }, [append, firstMissingField, requestTcpaConsent, state.consented, state.tcpaConsentGranted, tcpaConsentPending])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,6 +76,19 @@ export function ChatWidget() {
     append('user', text)
     const consentResponse = updateFromMessage(text)
 
+    if (consentResponse === 'tcpa-pending') {
+      append('assistant', tcpaDisclosure)
+      return
+    }
+    if (consentResponse === 'tcpa-accepted') {
+      append(
+        'assistant',
+        state.consented
+          ? 'Thank you. The number you shared before consent was discarded. Please provide your cell phone number again.'
+          : 'Thank you. TCPA consent is recorded. Any number shared before consent was discarded; please provide your number again if it is requested later.',
+      )
+      return
+    }
     if (isAccuracyBoundary(text)) {
       append('assistant', 'Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
       return
@@ -87,6 +124,16 @@ export function ChatWidget() {
     }
   }
 
+  function acceptTcpaConsent() {
+    grantTcpaConsent()
+    append(
+      'assistant',
+      state.consented
+        ? 'Thank you. The number you shared before consent was discarded. Please provide your cell phone number again.'
+        : 'Thank you. TCPA consent is recorded. Any number shared before consent was discarded; please provide your number again if it is requested later.',
+    )
+  }
+
   async function sendToProfessional() {
     if (sending) return
     setHandoff('')
@@ -95,7 +142,11 @@ export function ChatWidget() {
       const response = await fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
+        body: JSON.stringify({
+          ...state,
+          tcpa_consent_granted: state.tcpaConsentGranted,
+          consent_timestamp: state.tcpaConsentTimestamp,
+        }),
       })
       if (!response.ok) throw new Error('Handoff failed')
       window.dataLayer = window.dataLayer || []
@@ -126,7 +177,13 @@ export function ChatWidget() {
               </div>
             ))}
             {busy && <div className="message assistant typing" aria-label="Assistant is typing"><LoaderCircle className="spin" size={18} /> Thinking…</div>}
-            {state.consented && missingFields.length > 0 && (
+            {tcpaConsentPending && (
+              <div className="intake-status">
+                <span>Reply with explicit permission or use the button below.</span>
+                <button className="primary-button" type="button" onClick={acceptTcpaConsent}>I AGREE</button>
+              </div>
+            )}
+            {state.consented && missingFields.length > 0 && !tcpaConsentPending && (
               <div className="intake-status">
                 <span>When it feels natural, share {missingFields[0]}.</span>
                 <button className="skip-button" type="button" onClick={skipCurrent}>Skip this question</button>

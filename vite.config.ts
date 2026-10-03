@@ -1,20 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), cssInjectedByJsPlugin()],
   build: {
-    lib: {
-      entry: 'src/embed.tsx',
-      name: 'UnderwritingConcierge',
-      formats: ['iife'],
-      fileName: () => 'widget.js',
-    },
-    cssCodeSplit: false,
     rollupOptions: {
+      input: 'src/main.tsx',
       output: {
+        format: 'iife',
         inlineDynamicImports: true,
+        entryFileNames: 'widget.js',
       },
     },
   },

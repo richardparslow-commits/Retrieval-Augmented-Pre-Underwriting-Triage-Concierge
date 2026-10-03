@@ -1,5 +1,7 @@
 export interface UnderwritingState {
   consented: boolean
+  tcpaConsentGranted: boolean
+  tcpaConsentTimestamp: string
   fullName: string
   email: string
   cellPhone: string
@@ -22,6 +24,8 @@ export interface UnderwritingState {
 
 export const initialUnderwritingState: UnderwritingState = {
   consented: false,
+  tcpaConsentGranted: false,
+  tcpaConsentTimestamp: '',
   fullName: '',
   email: '',
   cellPhone: '',

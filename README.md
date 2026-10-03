@@ -10,7 +10,7 @@ npm run dev
 npm run build
 ```
 
-The Vite library build creates `dist/widget.js`, a single IIFE JavaScript bundle with its styles injected. Upload that file to WordPress and add:
+The Vite build creates `dist/widget.js`, a single IIFE JavaScript bundle with its styles injected. Upload that file to WordPress and add:
 
 ```html
 <script src="/path-to/widget.js" defer></script>
