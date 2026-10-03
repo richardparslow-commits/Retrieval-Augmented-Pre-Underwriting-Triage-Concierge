@@ -107,6 +107,13 @@ export function ChatWidget() {
         await say('Thank you for your consent. Please share your cell phone number.')
         return
       }
+      // Let "skip"/"no texts" replies reach the state collector before the phone
+      // gate, or they are mistaken for a phone number and the phone prompt repeats.
+      if (needsTcpa && (expressesUncertainty(text) || /\b(no|don't|do not|not)\b.*\b(text|sms)\b/i.test(text))) {
+        updateFromMessage(text)
+        await say(`No problem${name ? `, ${name}` : ''} — I've noted that.`)
+        return
+      }
       if (containsPhone(text)) {
         tcpaPending.current = true
         await say('I can’t save that phone number yet, so I discarded it.', `${TCPA_DISCLOSURE} Afterward, please share your number again.`)
