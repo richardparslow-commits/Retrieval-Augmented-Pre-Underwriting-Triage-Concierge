@@ -10,14 +10,27 @@ npm run dev
 npm run build
 ```
 
-The Vite library build creates `dist/widget.js`, a single IIFE JavaScript bundle with its styles injected. Upload that file to WordPress and add:
+The Vite build compiles `src/main.tsx` into `dist/widget.js`, a single IIFE JavaScript bundle with all styles injected into the JS via `vite-plugin-css-injected-by-js`. Upload that file to WordPress and add:
 
 ```html
 <script src="/path-to/widget.js" defer></script>
 <div id="ai-chat-root"></div>
 ```
 
-The script also creates `#ai-chat-root` if the container is omitted. The same `ChatWidget` component can be mounted in a React/Next.js app from `src/ChatWidget.tsx`.
+The script also creates `#ai-chat-root` if the container is omitted, and will not mount twice if executed more than once. The same `ChatWidget` component can be mounted in a React/Next.js app from `src/ChatWidget.tsx`.
+
+## Brand palette
+
+The color palette is defined once in `tailwind.config.js` under `theme.extend.colors.brand`:
+
+| Token | Value | Usage |
+| --- | --- | --- |
+| `brand.bg` | `#E2E8F0` | Backgrounds |
+| `brand.accent` | `#485B61` | Borders and accents |
+| `brand.alert` | `#CC0700` | Headings and alerts |
+| `brand.primary` | `#414C32` | Primary buttons |
+
+Tailwind v4 loads the config from `src/styles.css` via the `@config` directive, and the widget's stylesheet references these tokens through `theme('colors.brand.*')`.
 
 ## Service integration
 
