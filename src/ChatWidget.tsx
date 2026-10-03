@@ -1,13 +1,26 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
 import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, type ChatMessage } from './ChatAPI'
-import { TCPA_DISCLOSURE, containsPhone, isTcpaAgreement, useUnderwritingState } from './useUnderwritingState'
+import { type UnderwritingState } from './types'
+import { TCPA_DISCLOSURE, containsPhone, expressesUncertainty, firstName, isCorrection, isSmallTalk, isTcpaAgreement, useUnderwritingState } from './useUnderwritingState'
 
 interface DisplayMessage extends ChatMessage {
   id: number
 }
 
 const schedulingUrl = import.meta.env.VITE_SCHEDULING_URL || 'https://calendly.com/'
+
+// Match a person's typing rhythm: a brief, slightly varied pause before replying.
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 600))
+}
+
+// Vary intake prompts so the assistant sounds like a person, not a form.
+const intakePrompts = [
+  (label: string, name: string) => `When it feels natural, share ${label}${name ? `, ${name}` : ''}.`,
+  (label: string, name: string) => `Whenever you're ready${name ? `, ${name}` : ''}, could you share ${label}?`,
+  (label: string, name: string) => `${name ? `${name}, when` : 'When'} you have a moment, feel free to share ${label}.`,
+]
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -24,6 +37,9 @@ export function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const tcpaPending = useRef(false)
+  const collectedRef = useRef(state)
+  collectedRef.current = state
+  const name = firstName(state.fullName)
   const needsTcpa = missingFields[0] === 'your cell phone number' && !state.tcpa_consent_granted
   const summary = [
     ['Name', state.fullName],
@@ -48,6 +64,36 @@ export function ChatWidget() {
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }))
   }
 
+  // Deliver assistant messages the way a person would: a beat of typing, then the
+  // reply, with optional follow-up bubbles a moment later.
+  async function say(...contents: string[]) {
+    setBusy(true)
+    await pause()
+    append('assistant', contents[0])
+    for (const content of contents.slice(1)) {
+      await pause()
+      append('assistant', content)
+    }
+    setBusy(false)
+  }
+
+  // Acknowledge newly collected details like a person taking notes, then move on.
+  function acknowledgment(before: UnderwritingState, after: UnderwritingState): string {
+    const greeting = name ? `Thanks, ${name}` : 'Thank you'
+    const captured: string[] = []
+    if (!before.fullName && after.fullName) return `Thanks, ${firstName(after.fullName)}! It's nice to meet you.`
+    if (!before.dateOfBirth && after.dateOfBirth) captured.push('your date of birth')
+    if (!before.email && after.email) captured.push('your email')
+    if (!before.cellPhone && after.cellPhone) captured.push('your cell phone number')
+    if (!before.height && after.height) captured.push('your height')
+    if (!before.weight && after.weight) captured.push('your weight')
+    if (!before.gender && after.gender) captured.push('your gender')
+    if (!before.policyType && after.policyType) captured.push(`your interest in ${after.policyType}`)
+    if (!before.coverageAmount && after.coverageAmount) captured.push('the coverage amount')
+    if (captured.length === 0) return ''
+    return `${greeting} — I've noted ${captured.join(' and ')}.`
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = draft.trim()
@@ -58,37 +104,66 @@ export function ChatWidget() {
       if (isTcpaAgreement(text) && tcpaPending.current) {
         tcpaPending.current = false
         grantTcpaConsent()
-        append('assistant', 'Thank you for your consent. Please share your cell phone number.')
+        await say('Thank you for your consent. Please share your cell phone number.')
         return
       }
       if (containsPhone(text)) {
         tcpaPending.current = true
-        append('assistant', `I can’t save that phone number yet, so I discarded it. ${TCPA_DISCLOSURE} Afterward, please share your number again.`)
+        await say('I can’t save that phone number yet, so I discarded it.', `${TCPA_DISCLOSURE} Afterward, please share your number again.`)
         return
       }
     }
     const consentResponse = updateFromMessage(text)
 
     if (isAccuracyBoundary(text)) {
-      append('assistant', 'Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
+      await say('Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
       return
     }
     if (consentResponse === 'accepted') {
-      append('assistant', 'Thank you. Please share your full name to start. You may skip any question, and you can stop at any time.')
+      await say('Thank you. Please share your full name to start. You may skip any question, and you can stop at any time.')
       return
     }
     if (consentResponse === 'declined') {
-      append('assistant', 'No problem. We can keep this educational and you do not need to share personal information.')
+      await say('No problem. We can keep this educational and you do not need to share personal information.')
       return
     }
     if (isBindingQuoteRequest(text)) {
-      append('assistant', 'I can’t provide a binding quote or guarantee a rate or underwriting class. Only an insurer can determine that after reviewing an application. A licensed professional can help compare options.')
+      await say('I can’t provide a binding quote or guarantee a rate or underwriting class. Only an insurer can determine that after reviewing an application. A licensed professional can help compare options.')
       return
     }
     if (!state.consented && /\b(quote|apply|coverage amount|talk to an agent|pre[- ]underwrit)\b/i.test(text)) {
       requestConsent()
-      append('assistant', 'I can collect preliminary information to help a licensed professional prepare, including health details. It is optional and does not create an application or determine eligibility. May I gather that information?')
+      await say('I can collect preliminary information to help a licensed professional prepare, including health details. It is optional and does not create an application or determine eligibility. May I gather that information?')
       return
+    }
+    if (state.consented) {
+      if (expressesUncertainty(text)) {
+        await say(`That's completely fine${name ? `, ${name}` : ''} — you can skip any question or give your best estimate. A licensed professional can confirm the details later.`)
+        return
+      }
+      const updated = collectedRef.current
+      if (isCorrection(text)) {
+        const corrected: string[] = []
+        if (updated.email !== state.email) corrected.push('email')
+        if (updated.cellPhone !== state.cellPhone) corrected.push('phone number')
+        if (updated.fullName !== state.fullName) corrected.push('name')
+        if (corrected.length > 0) {
+          await say(`No problem — I've updated your ${corrected.join(' and ')}.`)
+          return
+        }
+      }
+      const note = acknowledgment(state, updated)
+      if (note) {
+        await say(note)
+        return
+      }
+      if (isSmallTalk(text)) {
+        const prompt = missingFields[0]
+        await say(prompt
+          ? `You're welcome! ${intakePrompts[0](prompt, name)}`
+          : 'Happy to help! Your preliminary summary is ready whenever you’d like to send it.')
+        return
+      }
     }
 
     setBusy(true)
@@ -150,7 +225,7 @@ export function ChatWidget() {
                     <span>{TCPA_DISCLOSURE}</span>
                     <button className="primary-button" type="button" onClick={() => { tcpaPending.current = false; grantTcpaConsent() }}>I AGREE</button>
                   </>
-                ) : <span>When it feels natural, share {missingFields[0]}.</span>}
+                ) : <span>{intakePrompts[messages.length % intakePrompts.length](missingFields[0], name)}{missingFields.length > 1 && missingFields.length <= 3 ? ` Only ${missingFields.length} more to go.` : ''}</span>}
                 <button className="skip-button" type="button" onClick={skipCurrent}>Skip this question</button>
               </div>
             )}
