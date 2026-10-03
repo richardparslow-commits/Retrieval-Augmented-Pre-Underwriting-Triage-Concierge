@@ -17,6 +17,26 @@ export function isTcpaAgreement(text: string): boolean {
   return tcpaAgreement.test(text)
 }
 
+const uncertaintyPattern = /\b(not sure|don'?t know|do not know|no idea|maybe|not certain|can'?t remember|unsure)\b/i
+const correctionPattern = /\b(actually|i meant|that'?s wrong|correction|i misspoke|wrong (?:email|number|name))\b/i
+const smallTalkPattern = /^\s*(hi|hello|hey|good (?:morning|afternoon|evening)|thanks|thank you|thx|lol|haha|ok(?:ay)?|cool|great|nice|got it|bye)[\s!.,?]*$/i
+
+export function expressesUncertainty(text: string): boolean {
+  return uncertaintyPattern.test(text)
+}
+
+export function isCorrection(text: string): boolean {
+  return correctionPattern.test(text)
+}
+
+export function isSmallTalk(text: string): boolean {
+  return smallTalkPattern.test(text)
+}
+
+export function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? ''
+}
+
 function capture(text: string, pattern: RegExp): string {
   return text.match(pattern)?.[1]?.trim() ?? ''
 }
