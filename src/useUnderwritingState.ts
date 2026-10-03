@@ -5,6 +5,18 @@ const affirmative = /\b(yes|yep|sure|okay|ok|go ahead|that's fine|that is fine)\
 const negative = /\b(no|no thanks|not now|rather not)\b/i
 const policyTypes: UnderwritingState['policyType'][] = ['Term', 'Whole Life', 'IUL']
 
+export const TCPA_DISCLOSURE = 'By providing your phone number, you consent to be contacted by a licensed insurance professional at that number, including by calls and text messages that may use automated technology. Consent is not a condition of purchase, message and data rates may apply, and you can opt out at any time. Type "I AGREE" or select the button below to consent.'
+const phonePattern = /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/
+const tcpaAgreement = /^\s*i\s+agree[.!\s]*$/i
+
+export function containsPhone(text: string): boolean {
+  return phonePattern.test(text)
+}
+
+export function isTcpaAgreement(text: string): boolean {
+  return tcpaAgreement.test(text)
+}
+
 function capture(text: string, pattern: RegExp): string {
   return text.match(pattern)?.[1]?.trim() ?? ''
 }
@@ -13,12 +25,13 @@ export function useUnderwritingState() {
   const [state, setState] = useState(initialUnderwritingState)
   const [skippedFields, setSkippedFields] = useState<Set<keyof UnderwritingState>>(() => new Set())
   const consentPending = useRef(false)
+  const tcpaGranted = useRef(false)
 
   const collect = useCallback((text: string) => {
     setState((current) => {
       const next = { ...current }
       const email = capture(text, /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i)
-      const phone = capture(text, /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/)
+      const phone = tcpaGranted.current ? capture(text, phonePattern) : ''
       const name = capture(text, /\b(?:my name is|i am|i'm|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b/)
       const dob = capture(text, /\b(?:dob|date of birth|born on|born)\s*(?:is|:)?\s*((?:\d{1,2}[/-]){2}\d{2,4}|\d{4}-\d{2}-\d{2})/i)
       const a1c = capture(text, /\b(?:a1c|a1c is|a1c was)\s*(?:of|around|about|is|was|:)?\s*(\d{1,2}(?:\.\d{1,2})?%?)/i)
@@ -61,6 +74,12 @@ export function useUnderwritingState() {
 
       return next
     })
+  }, [])
+
+  const grantTcpaConsent = useCallback(() => {
+    if (tcpaGranted.current) return
+    tcpaGranted.current = true
+    setState((current) => ({ ...current, tcpa_consent_granted: true, consent_timestamp: new Date().toISOString() }))
   }, [])
 
   const requestConsent = useCallback(() => {
@@ -113,5 +132,5 @@ export function useUnderwritingState() {
     if (key) setSkippedFields((current) => new Set(current).add(key))
   }, [pendingFields])
 
-  return { state, updateFromMessage, requestConsent, missingFields, skipCurrent }
+  return { state, updateFromMessage, requestConsent, grantTcpaConsent, missingFields, skipCurrent }
 }
