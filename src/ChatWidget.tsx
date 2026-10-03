@@ -37,8 +37,6 @@ export function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const tcpaPending = useRef(false)
-  const collectedRef = useRef(state)
-  collectedRef.current = state
   const name = firstName(state.fullName)
   const needsTcpa = missingFields[0] === 'your cell phone number' && !state.tcpa_consent_granted
   const summary = [
@@ -120,7 +118,7 @@ export function ChatWidget() {
         return
       }
     }
-    const consentResponse = updateFromMessage(text)
+    const { result: consentResponse, state: updated } = updateFromMessage(text)
 
     if (isAccuracyBoundary(text)) {
       await say('Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
@@ -148,7 +146,6 @@ export function ChatWidget() {
         await say(`That's completely fine${name ? `, ${name}` : ''} — you can skip any question or give your best estimate. A licensed professional can confirm the details later.`)
         return
       }
-      const updated = collectedRef.current
       if (isCorrection(text)) {
         const corrected: string[] = []
         if (updated.email !== state.email) corrected.push('email')
