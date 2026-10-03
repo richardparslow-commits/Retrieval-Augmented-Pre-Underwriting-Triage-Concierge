@@ -59,8 +59,9 @@ export function useUnderwritingState() {
       const dob = capture(text, /\b(?:dob|date of birth|born on|born)\s*(?:is|:)?\s*((?:\d{1,2}[/-]){2}\d{2,4}|\d{4}-\d{2}-\d{2})/i)
       const a1c = capture(text, /\b(?:a1c|a1c is|a1c was)\s*(?:of|around|about|is|was|:)?\s*(\d{1,2}(?:\.\d{1,2})?%?)/i)
       const amount = capture(text, /\$\s?([\d,]+(?:\.\d{2})?)/)
-      const height = capture(text, /\b((?:\d\s*(?:ft|feet|')\s*\d{1,2}\s*(?:in|inches|")?)|(?:\d{2,3}\s?cm))\b/i)
-      const weight = capture(text, /\b(?:weigh(?:t|ing)?(?:\s+is)?|i am|i'm)\s+(\d{2,3})\s?(?:lb|lbs|pounds)\b/i)
+      const height = capture(text, /\b((?:\d\s*(?:ft|feet|foot|'|’)\s*\d{1,2}\s*(?:in|inches|")?)|(?:\d\s+\d{1,2})(?=\s*(?:tall|ft|feet|foot|$))|(?:\d{2,3}\s?cm))\b/i)
+      const weightMatch = text.match(/\b(?:(?:weigh(?:t|ing|s)?(?:\s+is)?|i am|i'm)\s+)?(\d{2,3})\s?(?:lb|lbs|pounds)\b|\bweigh(?:ing)?\s+(\d{2,3})\b/i)
+      const weight = (weightMatch?.[1] ?? weightMatch?.[2] ?? '').trim()
 
       if (email) next.email = email
       if (phone) next.cellPhone = phone.replace(/[^\d+]/g, '')
