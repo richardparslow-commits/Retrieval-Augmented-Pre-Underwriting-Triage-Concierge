@@ -46,10 +46,13 @@ export function useUnderwritingState() {
   const [skippedFields, setSkippedFields] = useState<Set<keyof UnderwritingState>>(() => new Set())
   const consentPending = useRef(false)
   const tcpaGranted = useRef(false)
+  // Mirror of the latest state, updated synchronously inside collect() so callers
+  // can diff what a message changed without waiting for React to re-render.
+  const latest = useRef(state)
 
-  const collect = useCallback((text: string) => {
-    setState((current) => {
-      const next = { ...current }
+  const collect = useCallback((text: string): UnderwritingState => {
+    const next = { ...latest.current }
+    {
       const email = capture(text, /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i)
       const phone = tcpaGranted.current ? capture(text, phonePattern) : ''
       const name = capture(text, /\b(?:my name is|i am|i'm|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b/)
@@ -91,34 +94,39 @@ export function useUnderwritingState() {
       if (/\b(male|man|men)\b/i.test(text)) next.gender = 'Male'
       if (/\b(non[- ]?binary|genderqueer)\b/i.test(text)) next.gender = 'Non-binary'
       if (/\b(prefer not to say|prefer not to answer)\b/i.test(text)) next.gender = 'Prefer not to say'
+    }
 
-      return next
-    })
+    latest.current = next
+    setState(next)
+    return next
   }, [])
 
   const grantTcpaConsent = useCallback(() => {
     if (tcpaGranted.current) return
     tcpaGranted.current = true
-    setState((current) => ({ ...current, tcpa_consent_granted: true, consent_timestamp: new Date().toISOString() }))
+    const next = { ...latest.current, tcpa_consent_granted: true, consent_timestamp: new Date().toISOString() }
+    latest.current = next
+    setState(next)
   }, [])
 
   const requestConsent = useCallback(() => {
     consentPending.current = true
   }, [])
 
-  const updateFromMessage = useCallback((text: string): 'accepted' | 'declined' | null => {
+  const updateFromMessage = useCallback((text: string): { result: 'accepted' | 'declined' | null; state: UnderwritingState } => {
     if (consentPending.current) {
       consentPending.current = false
-      if (negative.test(text)) return 'declined'
+      if (negative.test(text)) return { result: 'declined', state: latest.current }
       if (affirmative.test(text)) {
-        setState((current) => ({ ...current, consented: true }))
-        collect(text)
-        return 'accepted'
+        const consentedState = { ...latest.current, consented: true }
+        latest.current = consentedState
+        setState(consentedState)
+        return { result: 'accepted', state: collect(text) }
       }
     }
-    if (state.consented) collect(text)
-    return null
-  }, [collect, state.consented])
+    if (latest.current.consented) return { result: null, state: collect(text) }
+    return { result: null, state: latest.current }
+  }, [collect])
 
   const pendingFields = useMemo(() => {
     if (!state.consented) return []
