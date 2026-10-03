@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (this.state.failed) {
-      return <div className="concierge-error" role="alert">The chat is temporarily unavailable. Please refresh and try again.</div>
+      return <div className="rounded-xl border border-brand-accent bg-brand-bg p-4 text-brand-alert" role="alert">The chat is temporarily unavailable. Please refresh and try again.</div>
     }
     return this.props.children
   }
