@@ -1,5 +1,7 @@
 export interface LeadPayload {
   consented: true
+  tcpa_consent_granted: boolean
+  consent_timestamp: string
   fullName: string
   email: string
   cellPhone: string
@@ -20,13 +22,19 @@ export interface LeadPayload {
   cancerFreeDuration: string
 }
 
+function isIsoTimestamp(value: unknown): boolean {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return false
+  const time = Date.parse(value)
+  return !Number.isNaN(time) && time <= Date.now() + 60_000
+}
+
 function isLeadPayload(value: unknown): value is LeadPayload {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const payload = value as Partial<LeadPayload>
   const stringFields: (keyof LeadPayload)[] = [
     'fullName', 'email', 'cellPhone', 'textMessagePreference', 'dateOfBirth', 'gender',
     'height', 'weight', 'tobaccoNicotineVaping', 'policyType', 'coverageAmount',
-    'diabetesType', 'diabetesTreatment', 'lastA1C', 'cancerType', 'cancerFreeDuration',
+    'diabetesType', 'diabetesTreatment', 'lastA1C', 'cancerType', 'cancerFreeDuration', 'consent_timestamp',
   ]
   return payload.consented === true &&
     typeof payload.hasDiabetes === 'boolean' &&
@@ -36,6 +44,8 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) &&
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
+    typeof payload.tcpa_consent_granted === 'boolean' &&
+    (payload.cellPhone === '' || (payload.tcpa_consent_granted === true && isIsoTimestamp(payload.consent_timestamp))) &&
     (payload.policyType === '' || payload.policyType === 'Term' || payload.policyType === 'Whole Life' || payload.policyType === 'IUL') &&
     (payload.textMessagePreference === '' || payload.textMessagePreference === 'yes' || payload.textMessagePreference === 'no')
 }
@@ -76,6 +86,8 @@ export async function handleWebhookRequest(request: Request): Promise<Response> 
         fullName: payload.fullName,
         email: payload.email,
         cellPhone: payload.cellPhone,
+        tcpa_consent_granted: payload.tcpa_consent_granted,
+        consent_timestamp: payload.consent_timestamp,
         textMessagePreference: payload.textMessagePreference,
         dateOfBirth: payload.dateOfBirth,
         gender: payload.gender,

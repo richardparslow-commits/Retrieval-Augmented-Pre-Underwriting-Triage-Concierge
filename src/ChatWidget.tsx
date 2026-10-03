@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
 import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, type ChatMessage } from './ChatAPI'
-import { useUnderwritingState } from './useUnderwritingState'
+import { TCPA_DISCLOSURE, containsPhone, isTcpaAgreement, useUnderwritingState } from './useUnderwritingState'
 
 interface DisplayMessage extends ChatMessage {
   id: number
@@ -20,13 +20,17 @@ export function ChatWidget() {
     role: 'assistant',
     content: 'Hi! I can explain Term, Whole Life, and IUL in plain language. I can also help organize preliminary information for a licensed professional—no binding quotes or approval guarantees. What would you like to learn?',
   }])
-  const { state, updateFromMessage, requestConsent, missingFields, skipCurrent } = useUnderwritingState()
+  const { state, updateFromMessage, requestConsent, grantTcpaConsent, missingFields, skipCurrent } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
+  const tcpaPending = useRef(false)
+  const needsTcpa = missingFields[0] === 'your cell phone number' && !state.tcpa_consent_granted
   const summary = [
     ['Name', state.fullName],
     ['Email', state.email],
     ['Cell phone', state.cellPhone],
+    ['TCPA consent', state.tcpa_consent_granted ? 'Granted' : ''],
+    ['Consent timestamp', state.consent_timestamp],
     ['Text messages', state.textMessagePreference],
     ['Date of birth', state.dateOfBirth],
     ['Gender', state.gender],
@@ -50,6 +54,19 @@ export function ChatWidget() {
     if (!text || busy) return
     setDraft('')
     append('user', text)
+    if (!state.tcpa_consent_granted) {
+      if (isTcpaAgreement(text) && tcpaPending.current) {
+        tcpaPending.current = false
+        grantTcpaConsent()
+        append('assistant', 'Thank you for your consent. Please share your cell phone number.')
+        return
+      }
+      if (containsPhone(text)) {
+        tcpaPending.current = true
+        append('assistant', `I can’t save that phone number yet, so I discarded it. ${TCPA_DISCLOSURE} Afterward, please share your number again.`)
+        return
+      }
+    }
     const consentResponse = updateFromMessage(text)
 
     if (isAccuracyBoundary(text)) {
@@ -95,7 +112,7 @@ export function ChatWidget() {
       const response = await fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
+        body: JSON.stringify(state.cellPhone ? state : { ...state, tcpa_consent_granted: false, consent_timestamp: '' }),
       })
       if (!response.ok) throw new Error('Handoff failed')
       window.dataLayer = window.dataLayer || []
@@ -128,7 +145,12 @@ export function ChatWidget() {
             {busy && <div className="message assistant typing" aria-label="Assistant is typing"><LoaderCircle className="spin" size={18} /> Thinking…</div>}
             {state.consented && missingFields.length > 0 && (
               <div className="intake-status">
-                <span>When it feels natural, share {missingFields[0]}.</span>
+                {needsTcpa ? (
+                  <>
+                    <span>{TCPA_DISCLOSURE}</span>
+                    <button className="primary-button" type="button" onClick={() => { tcpaPending.current = false; grantTcpaConsent() }}>I AGREE</button>
+                  </>
+                ) : <span>When it feels natural, share {missingFields[0]}.</span>}
                 <button className="skip-button" type="button" onClick={skipCurrent}>Skip this question</button>
               </div>
             )}
