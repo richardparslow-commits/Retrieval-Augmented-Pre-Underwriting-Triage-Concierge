@@ -201,54 +201,119 @@ export function ChatWidget() {
   }
 
   return (
-    <div className="concierge-widget flex flex-col gap-5 p-10">
+    <div className="pointer-events-none fixed inset-0 z-[9998] flex flex-col items-end justify-end gap-5 p-10 font-sans text-[#263238] max-[520px]:p-3">
       {open && (
-        <section className="chat-panel flex flex-col gap-5" aria-label="Pre-underwriting concierge">
-          <header className="chat-header">
-            <div className="chat-title">
-              <span className="chat-icon"><ShieldCheck size={20} aria-hidden="true" /></span>
-              <div><strong>Coverage Concierge</strong><span>Educational support · Not an insurer</span></div>
+        <section
+          aria-label="Pre-underwriting concierge"
+          className="pointer-events-auto flex h-[min(680px,calc(100vh-156px))] max-h-[760px] w-[min(410px,calc(100vw-112px))] flex-col gap-5 overflow-hidden rounded-2xl border border-brand-accent bg-white p-5 shadow-[0_16px_48px_#1c2c3033] max-[520px]:h-[min(680px,calc(100dvh-92px))] max-[520px]:max-h-none max-[520px]:w-screen max-[520px]:rounded-none max-[520px]:p-0"
+        >
+          <header className="flex items-center justify-between border-b border-brand-accent bg-brand-bg px-[18px] py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white text-brand-primary">
+                <ShieldCheck size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <strong className="block text-[15px] text-brand-alert">Coverage Concierge</strong>
+                <span className="mt-[3px] block text-xs text-[#526066]">Educational support · Not an insurer</span>
+              </div>
             </div>
-            <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close chat"><X size={20} /></button>
+            <button className="cursor-pointer border-0 bg-transparent p-1.5 text-brand-accent" onClick={() => setOpen(false)} aria-label="Close chat">
+              <X size={20} />
+            </button>
           </header>
-          <div className="chat-messages" ref={scrollRef} aria-live="polite">
+          <div ref={scrollRef} aria-live="polite" className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-5">
             {messages.map((message) => (
-              <div key={message.id} className={`message ${message.role}`}>
-                <p>{message.content}</p>
+              <div
+                key={message.id}
+                className={message.role === 'user'
+                  ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-[14px] bg-brand-primary px-3.5 py-[11px] leading-[1.5] text-white'
+                  : 'max-w-[88%] self-start whitespace-pre-wrap rounded-[14px] border border-[#cbd5dd] bg-brand-bg px-3.5 py-[11px] leading-[1.5]'}
+              >
+                <p className="m-0">{message.content}</p>
               </div>
             ))}
-            {busy && <div className="message assistant typing" aria-label="Assistant is typing"><LoaderCircle className="spin" size={18} /> Thinking…</div>}
+            {busy && (
+              <div
+                aria-label="Assistant is typing"
+                className="flex max-w-[88%] items-center gap-2 self-start whitespace-pre-wrap rounded-[14px] border border-[#cbd5dd] bg-brand-bg px-3.5 py-[11px] text-[13px] leading-[1.5] text-brand-accent"
+              >
+                <LoaderCircle className="animate-spin" size={18} /> Thinking…
+              </div>
+            )}
             {state.consented && missingFields.length > 0 && (
-              <div className="intake-status">
+              <div className="flex items-center justify-between px-1 text-xs text-brand-accent">
                 {needsTcpa ? (
                   <>
                     <span>{TCPA_DISCLOSURE}</span>
-                    <button className="primary-button" type="button" onClick={() => { tcpaPending.current = false; grantTcpaConsent() }}>I AGREE</button>
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-lg border-0 bg-brand-primary px-3 py-2.5 text-white transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_#18211655]"
+                      onClick={() => { tcpaPending.current = false; grantTcpaConsent() }}
+                    >
+                      I AGREE
+                    </button>
                   </>
                 ) : <span>{intakePrompts[messages.length % intakePrompts.length](missingFields[0], name)}{missingFields.length > 1 && missingFields.length <= 3 ? ` Only ${missingFields.length} more to go.` : ''}</span>}
-                <button className="skip-button" type="button" onClick={skipCurrent}>Skip this question</button>
+                <button type="button" className="cursor-pointer border-0 bg-transparent text-xs text-brand-primary underline" onClick={skipCurrent}>Skip this question</button>
               </div>
             )}
             {state.consented && missingFields.length === 0 && (
-              <div className="handoff-card">
-                <strong>Preliminary summary ready</strong>
-                <dl>{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-                <p>This is not an application, quote, or eligibility decision. A licensed professional can review your information.</p>
-                <button className="primary-button" onClick={sendToProfessional} disabled={sending}>{sending ? 'Sending…' : 'Send summary securely'}</button>
-                {handoff && <p role="status">{handoff}</p>}
-                <a className="schedule-link" href={schedulingUrl} target="_blank" rel="noreferrer"><CalendarDays size={16} /> Schedule a conversation</a>
+              <div className="flex flex-col gap-2.5 rounded-xl border border-brand-accent bg-[#f7f8f5] p-3.5">
+                <strong className="text-brand-alert">Preliminary summary ready</strong>
+                <dl className="m-0 grid max-h-[150px] gap-1.5 overflow-y-auto">
+                  {summary.map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[42%_1fr] gap-2 text-xs">
+                      <dt className="font-semibold text-brand-accent">{label}</dt>
+                      <dd className="m-0 break-all">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="m-0 text-[13px] leading-[1.5]">This is not an application, quote, or eligibility decision. A licensed professional can review your information.</p>
+                <button
+                  className="cursor-pointer rounded-lg border-0 bg-brand-primary px-3 py-2.5 text-white transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_#18211655]"
+                  onClick={sendToProfessional}
+                  disabled={sending}
+                >
+                  {sending ? 'Sending…' : 'Send summary securely'}
+                </button>
+                {handoff && <p role="status" className="m-0 text-[13px] leading-[1.5]">{handoff}</p>}
+                <a className="flex items-center gap-[7px] text-[13px] font-semibold text-brand-primary underline" href={schedulingUrl} target="_blank" rel="noreferrer">
+                  <CalendarDays size={16} /> Schedule a conversation
+                </a>
               </div>
             )}
           </div>
-          <div className="privacy-note"><ShieldCheck size={14} aria-hidden="true" /> Share only what you’re comfortable sharing.</div>
-          <form className="chat-composer" onSubmit={submit}>
+          <div className="flex items-center gap-1.5 border-t border-[#d7dfe4] bg-[#f8fafc] px-4 py-[9px] text-[11px] text-brand-accent">
+            <ShieldCheck size={14} aria-hidden="true" /> Share only what you’re comfortable sharing.
+          </div>
+          <form className="flex items-end gap-2.5 border-t border-[#d7dfe4] p-3" onSubmit={submit}>
             <label className="sr-only" htmlFor="concierge-message">Your message</label>
-            <textarea id="concierge-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a question…" rows={1} disabled={busy} />
-            <button className="send-button" type="submit" disabled={busy || !draft.trim()} aria-label="Send message"><ArrowUp size={19} /></button>
+            <textarea
+              id="concierge-message"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Ask a question…"
+              rows={1}
+              disabled={busy}
+              className="max-h-[100px] w-full resize-y rounded-xl border border-[#9aa9ad] p-[11px_12px] font-[inherit] outline-brand-accent"
+            />
+            <button
+              type="submit"
+              disabled={busy || !draft.trim()}
+              aria-label="Send message"
+              className="flex h-[42px] min-w-[42px] cursor-pointer items-center justify-center rounded-full border-0 bg-brand-primary text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowUp size={19} />
+            </button>
           </form>
         </section>
       )}
-      <button className="launcher" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-label={open ? 'Close chat' : 'Open coverage concierge'}>
+      <button
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-label={open ? 'Close chat' : 'Open coverage concierge'}
+        className="pointer-events-auto flex min-h-14 cursor-pointer items-center gap-2.5 rounded-full border-0 bg-brand-primary px-5 font-[inherit] text-white shadow-[0_8px_24px_#18211655] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_#18211655]"
+      >
         {open ? <X size={23} /> : <MessageCircle size={23} />}
         <span>{open ? 'Close' : 'Ask a question'}</span>
       </button>
