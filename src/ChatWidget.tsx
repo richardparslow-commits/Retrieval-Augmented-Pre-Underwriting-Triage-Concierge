@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
 import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, type ChatMessage } from './ChatAPI'
 import { useUnderwritingState } from './useUnderwritingState'
@@ -8,7 +8,7 @@ interface DisplayMessage extends ChatMessage {
 }
 
 const schedulingUrl = import.meta.env.VITE_SCHEDULING_URL || 'https://calendly.com/'
-const tcpaDisclosure = "To text or call you with updates about your life insurance inquiry, I need your permission. By replying 'I AGREE', you provide prior express written consent for Life Insurance Broker Advocate to contact you via SMS and phone calls, including using automated technology. Consent is not a condition of purchase. Message/data rates apply."
+const tcpaDisclosure = 'By checking this box and providing your number, you provide prior express written consent for Life Insurance Broker Advocate to contact you via SMS and phone calls, including using automated technology. Consent is not a condition of purchase. Message/data rates apply.'
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -56,39 +56,27 @@ export function ChatWidget() {
   }, [])
 
   const firstMissingField = missingFields[0]
+  const phoneStepActive = state.consented && firstMissingField === 'your cell phone number'
+  const phoneConsentRequired = phoneStepActive && !state.tcpaConsentGranted
   useEffect(() => {
-    if (
-      state.consented &&
-      firstMissingField === 'your cell phone number' &&
-      !state.tcpaConsentGranted &&
-      !tcpaConsentPending
-    ) {
+    if (phoneStepActive && !state.tcpaConsentGranted && !tcpaConsentPending) {
       requestTcpaConsent()
-      append('assistant', tcpaDisclosure)
     }
-  }, [append, firstMissingField, requestTcpaConsent, state.consented, state.tcpaConsentGranted, tcpaConsentPending])
+  }, [phoneStepActive, requestTcpaConsent, state.tcpaConsentGranted, tcpaConsentPending])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = draft.trim()
-    if (!text || busy) return
+    if (!text || busy || phoneConsentRequired) return
     setDraft('')
-    append('user', text)
     const consentResponse = updateFromMessage(text)
 
     if (consentResponse === 'tcpa-pending') {
-      append('assistant', tcpaDisclosure)
+      append('user', '[Phone number withheld until consent is granted]')
+      append('assistant', 'That number was not saved. Please check the consent box before providing your number again.')
       return
     }
-    if (consentResponse === 'tcpa-accepted') {
-      append(
-        'assistant',
-        state.consented
-          ? 'Thank you. The number you shared before consent was discarded. Please provide your cell phone number again.'
-          : 'Thank you. TCPA consent is recorded. Any number shared before consent was discarded; please provide your number again if it is requested later.',
-      )
-      return
-    }
+    append('user', text)
     if (isAccuracyBoundary(text)) {
       append('assistant', 'Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
       return
@@ -124,14 +112,8 @@ export function ChatWidget() {
     }
   }
 
-  function acceptTcpaConsent() {
-    grantTcpaConsent()
-    append(
-      'assistant',
-      state.consented
-        ? 'Thank you. The number you shared before consent was discarded. Please provide your cell phone number again.'
-        : 'Thank you. TCPA consent is recorded. Any number shared before consent was discarded; please provide your number again if it is requested later.',
-    )
+  function handleTcpaConsentChange(event: ChangeEvent<HTMLInputElement>) {
+    if (event.target.checked) grantTcpaConsent()
   }
 
   async function sendToProfessional() {
@@ -177,13 +159,18 @@ export function ChatWidget() {
               </div>
             ))}
             {busy && <div className="message assistant typing" aria-label="Assistant is typing"><LoaderCircle className="spin" size={18} /> Thinking…</div>}
-            {tcpaConsentPending && (
-              <div className="intake-status">
-                <span>Reply with explicit permission or use the button below.</span>
-                <button className="primary-button" type="button" onClick={acceptTcpaConsent}>I AGREE</button>
+            {(tcpaConsentPending || phoneStepActive) && (
+              <div className="tcpa-consent">
+                <input
+                  id="tcpa-consent"
+                  type="checkbox"
+                  checked={state.tcpaConsentGranted}
+                  onChange={handleTcpaConsentChange}
+                />
+                <label htmlFor="tcpa-consent">{tcpaDisclosure}</label>
               </div>
             )}
-            {state.consented && missingFields.length > 0 && !tcpaConsentPending && (
+            {state.consented && missingFields.length > 0 && (
               <div className="intake-status">
                 <span>When it feels natural, share {missingFields[0]}.</span>
                 <button className="skip-button" type="button" onClick={skipCurrent}>Skip this question</button>
@@ -203,8 +190,8 @@ export function ChatWidget() {
           <div className="privacy-note"><ShieldCheck size={14} aria-hidden="true" /> Share only what you’re comfortable sharing.</div>
           <form className="chat-composer" onSubmit={submit}>
             <label className="sr-only" htmlFor="concierge-message">Your message</label>
-            <textarea id="concierge-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a question…" rows={1} disabled={busy} />
-            <button className="send-button" type="submit" disabled={busy || !draft.trim()} aria-label="Send message"><ArrowUp size={19} /></button>
+            <textarea id="concierge-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={phoneConsentRequired ? 'Check the consent box before providing your phone number.' : 'Ask a question…'} rows={1} disabled={busy || phoneConsentRequired} />
+            <button className="send-button" type="submit" disabled={busy || phoneConsentRequired || !draft.trim()} aria-label="Send message"><ArrowUp size={19} /></button>
           </form>
         </section>
       )}

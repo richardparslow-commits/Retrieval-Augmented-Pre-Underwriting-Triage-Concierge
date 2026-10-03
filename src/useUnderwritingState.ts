@@ -3,7 +3,6 @@ import { initialUnderwritingState, type UnderwritingState } from './types'
 
 const affirmative = /\b(yes|yep|sure|okay|ok|go ahead|that's fine|that is fine)\b/i
 const negative = /\b(no|no thanks|not now|rather not)\b/i
-const tcpaAffirmative = /^[\s\p{P}]*I\s+AGREE[\s\p{P}]*$/iu
 const phonePattern = /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/
 const policyTypes: UnderwritingState['policyType'][] = ['Term', 'Whole Life', 'IUL']
 
@@ -15,7 +14,6 @@ export function useUnderwritingState() {
   const [state, setState] = useState(initialUnderwritingState)
   const [skippedFields, setSkippedFields] = useState<Set<keyof UnderwritingState>>(() => new Set())
   const underwritingConsentPending = useRef(false)
-  const tcpaConsentPendingRef = useRef(false)
   const [tcpaConsentPending, setTcpaConsentPending] = useState(false)
 
   const collect = useCallback((text: string) => {
@@ -72,12 +70,10 @@ export function useUnderwritingState() {
   }, [])
 
   const requestTcpaConsent = useCallback(() => {
-    tcpaConsentPendingRef.current = true
     setTcpaConsentPending(true)
   }, [])
 
   const grantTcpaConsent = useCallback(() => {
-    tcpaConsentPendingRef.current = false
     setTcpaConsentPending(false)
     setState((current) => ({
       ...current,
@@ -86,15 +82,7 @@ export function useUnderwritingState() {
     }))
   }, [])
 
-  const updateFromMessage = useCallback((text: string): 'accepted' | 'declined' | 'tcpa-accepted' | 'tcpa-pending' | null => {
-    if (tcpaConsentPendingRef.current) {
-      if (tcpaAffirmative.test(text)) {
-        grantTcpaConsent()
-        return 'tcpa-accepted'
-      }
-      return 'tcpa-pending'
-    }
-
+  const updateFromMessage = useCallback((text: string): 'accepted' | 'declined' | 'tcpa-pending' | null => {
     let underwritingAccepted = false
     if (underwritingConsentPending.current) {
       underwritingConsentPending.current = false
@@ -147,7 +135,10 @@ export function useUnderwritingState() {
   const missingFields = pendingFields.map(([, label]) => label)
   const skipCurrent = useCallback(() => {
     const key = pendingFields[0]?.[0]
-    if (key) setSkippedFields((current) => new Set(current).add(key))
+    if (key) {
+      setSkippedFields((current) => new Set(current).add(key))
+      if (key === 'cellPhone') setTcpaConsentPending(false)
+    }
   }, [pendingFields])
 
   return {
