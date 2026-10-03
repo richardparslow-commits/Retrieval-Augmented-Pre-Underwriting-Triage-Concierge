@@ -41,6 +41,9 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .intake-status { color: #485B61; font-size: 12px; padding: 0 4px; }
 .intake-status { align-items: center; display: flex; justify-content: space-between; }
+.tcpa-consent { align-items: flex-start; background: #f8fafc; border: 1px solid #cbd5dd; border-radius: 10px; color: #485B61; display: flex; font-size: 12px; gap: 8px; line-height: 1.4; padding: 10px; }
+.tcpa-consent input { flex-shrink: 0; height: 16px; margin-top: 2px; width: 16px; }
+.tcpa-consent input:focus-visible { outline: 2px solid var(--concierge-accent); outline-offset: 2px; }
 .skip-button { background: transparent; border: 0; color: var(--concierge-primary); cursor: pointer; font-size: 12px; text-decoration: underline; }
 .privacy-note { align-items: center; background: #f8fafc; border-top: 1px solid #d7dfe4; color: #485B61; display: flex; font-size: 11px; gap: 6px; padding: 9px 16px; }
 .chat-composer { align-items: flex-end; border-top: 1px solid #d7dfe4; display: flex; gap: 10px; padding: 12px; }

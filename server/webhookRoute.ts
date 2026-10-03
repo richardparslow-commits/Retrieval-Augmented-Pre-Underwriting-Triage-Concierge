@@ -3,6 +3,8 @@ export interface LeadPayload {
   fullName: string
   email: string
   cellPhone: string
+  tcpaConsentGranted?: boolean
+  tcpaConsentTimestamp?: string
   textMessagePreference: 'yes' | 'no' | ''
   dateOfBirth: string
   gender: string
@@ -76,6 +78,8 @@ export async function handleWebhookRequest(request: Request): Promise<Response> 
         fullName: payload.fullName,
         email: payload.email,
         cellPhone: payload.cellPhone,
+        tcpaConsentGranted: payload.tcpaConsentGranted === true,
+        tcpaConsentTimestamp: typeof payload.tcpaConsentTimestamp === 'string' ? payload.tcpaConsentTimestamp.slice(0, 40) : '',
         textMessagePreference: payload.textMessagePreference,
         dateOfBirth: payload.dateOfBirth,
         gender: payload.gender,

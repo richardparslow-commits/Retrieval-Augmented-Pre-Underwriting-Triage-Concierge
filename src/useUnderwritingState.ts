@@ -5,6 +5,8 @@ const affirmative = /\b(yes|yep|sure|okay|ok|go ahead|that's fine|that is fine)\
 const negative = /\b(no|no thanks|not now|rather not)\b/i
 const policyTypes: UnderwritingState['policyType'][] = ['Term', 'Whole Life', 'IUL']
 
+const phonePattern = /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/
+
 function capture(text: string, pattern: RegExp): string {
   return text.match(pattern)?.[1]?.trim() ?? ''
 }
@@ -18,7 +20,7 @@ export function useUnderwritingState() {
     setState((current) => {
       const next = { ...current }
       const email = capture(text, /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i)
-      const phone = capture(text, /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/)
+      const phone = capture(text, phonePattern)
       const name = capture(text, /\b(?:my name is|i am|i'm|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b/)
       const dob = capture(text, /\b(?:dob|date of birth|born on|born)\s*(?:is|:)?\s*((?:\d{1,2}[/-]){2}\d{2,4}|\d{4}-\d{2}-\d{2})/i)
       const a1c = capture(text, /\b(?:a1c|a1c is|a1c was)\s*(?:of|around|about|is|was|:)?\s*(\d{1,2}(?:\.\d{1,2})?%?)/i)
@@ -27,7 +29,7 @@ export function useUnderwritingState() {
       const weight = capture(text, /\b(?:weigh(?:t|ing)?(?:\s+is)?|i am|i'm)\s+(\d{2,3})\s?(?:lb|lbs|pounds)\b/i)
 
       if (email) next.email = email
-      if (phone) next.cellPhone = phone.replace(/[^\d+]/g, '')
+      if (phone && current.tcpaConsentGranted) next.cellPhone = phone.replace(/[^\d+]/g, '')
       if (name) next.fullName = name
       if (dob) next.dateOfBirth = dob
       if (a1c) next.lastA1C = a1c
@@ -67,7 +69,13 @@ export function useUnderwritingState() {
     consentPending.current = true
   }, [])
 
-  const updateFromMessage = useCallback((text: string): 'accepted' | 'declined' | null => {
+  const setTcpaConsent = useCallback((granted: boolean) => {
+    setState((current) => granted
+      ? { ...current, tcpaConsentGranted: true, tcpaConsentTimestamp: new Date().toISOString() }
+      : { ...current, tcpaConsentGranted: false, tcpaConsentTimestamp: '', cellPhone: '' })
+  }, [])
+
+  const updateFromMessage = useCallback((text: string): 'accepted' | 'declined' | 'tcpa-required' | null => {
     if (consentPending.current) {
       consentPending.current = false
       if (negative.test(text)) return 'declined'
@@ -77,9 +85,12 @@ export function useUnderwritingState() {
         return 'accepted'
       }
     }
-    if (state.consented) collect(text)
+    if (state.consented) {
+      collect(text)
+      if (!state.tcpaConsentGranted && phonePattern.test(text)) return 'tcpa-required'
+    }
     return null
-  }, [collect, state.consented])
+  }, [collect, state.consented, state.tcpaConsentGranted])
 
   const pendingFields = useMemo(() => {
     if (!state.consented) return []
@@ -113,5 +124,7 @@ export function useUnderwritingState() {
     if (key) setSkippedFields((current) => new Set(current).add(key))
   }, [pendingFields])
 
-  return { state, updateFromMessage, requestConsent, missingFields, skipCurrent }
+  const phoneStep = pendingFields[0]?.[0] === 'cellPhone'
+
+  return { state, updateFromMessage, requestConsent, setTcpaConsent, phoneStep, missingFields, skipCurrent }
 }

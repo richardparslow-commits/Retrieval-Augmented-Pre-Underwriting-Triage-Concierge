@@ -7,6 +7,7 @@ interface DisplayMessage extends ChatMessage {
   id: number
 }
 
+const tcpaDisclosure = 'By checking this box and providing your number, you provide prior express written consent for Life Insurance Broker Advocate to contact you via SMS and phone calls...'
 const schedulingUrl = import.meta.env.VITE_SCHEDULING_URL || 'https://calendly.com/'
 
 export function ChatWidget() {
@@ -20,13 +21,15 @@ export function ChatWidget() {
     role: 'assistant',
     content: 'Hi! I can explain Term, Whole Life, and IUL in plain language. I can also help organize preliminary information for a licensed professional—no binding quotes or approval guarantees. What would you like to learn?',
   }])
-  const { state, updateFromMessage, requestConsent, missingFields, skipCurrent } = useUnderwritingState()
+  const { state, updateFromMessage, requestConsent, setTcpaConsent, phoneStep, missingFields, skipCurrent } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
+  const phoneLocked = state.consented && phoneStep && !state.tcpaConsentGranted
   const summary = [
     ['Name', state.fullName],
     ['Email', state.email],
     ['Cell phone', state.cellPhone],
+    ['TCPA consent', state.tcpaConsentGranted ? `granted at ${state.tcpaConsentTimestamp}` : ''],
     ['Text messages', state.textMessagePreference],
     ['Date of birth', state.dateOfBirth],
     ['Gender', state.gender],
@@ -54,6 +57,10 @@ export function ChatWidget() {
 
     if (isAccuracyBoundary(text)) {
       append('assistant', 'Trust and estate questions can have important legal and personal consequences. I can’t advise on them, but I can connect you with a licensed human expert to discuss your situation.')
+      return
+    }
+    if (consentResponse === 'tcpa-required') {
+      append('assistant', `I can’t save a phone number until you confirm consent. Please review and check the box below first. ${tcpaDisclosure}`)
       return
     }
     if (consentResponse === 'accepted') {
@@ -126,6 +133,12 @@ export function ChatWidget() {
               </div>
             ))}
             {busy && <div className="message assistant typing" aria-label="Assistant is typing"><LoaderCircle className="spin" size={18} /> Thinking…</div>}
+            {state.consented && phoneStep && (
+              <div className="tcpa-consent">
+                <input id="tcpa-consent" type="checkbox" checked={state.tcpaConsentGranted} onChange={(event) => setTcpaConsent(event.target.checked)} />
+                <label htmlFor="tcpa-consent">{tcpaDisclosure}</label>
+              </div>
+            )}
             {state.consented && missingFields.length > 0 && (
               <div className="intake-status">
                 <span>When it feels natural, share {missingFields[0]}.</span>
@@ -146,8 +159,8 @@ export function ChatWidget() {
           <div className="privacy-note"><ShieldCheck size={14} aria-hidden="true" /> Share only what you’re comfortable sharing.</div>
           <form className="chat-composer" onSubmit={submit}>
             <label className="sr-only" htmlFor="concierge-message">Your message</label>
-            <textarea id="concierge-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a question…" rows={1} disabled={busy} />
-            <button className="send-button" type="submit" disabled={busy || !draft.trim()} aria-label="Send message"><ArrowUp size={19} /></button>
+            <textarea id="concierge-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={phoneLocked ? 'Check the consent box to enter your phone number' : 'Ask a question…'} rows={1} disabled={busy || phoneLocked} />
+            <button className="send-button" type="submit" disabled={busy || phoneLocked || !draft.trim()} aria-label="Send message"><ArrowUp size={19} /></button>
           </form>
         </section>
       )}

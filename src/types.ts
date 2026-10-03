@@ -3,6 +3,8 @@ export interface UnderwritingState {
   fullName: string
   email: string
   cellPhone: string
+  tcpaConsentGranted: boolean
+  tcpaConsentTimestamp: string
   textMessagePreference: 'yes' | 'no' | ''
   dateOfBirth: string
   gender: string
@@ -25,6 +27,8 @@ export const initialUnderwritingState: UnderwritingState = {
   fullName: '',
   email: '',
   cellPhone: '',
+  tcpaConsentGranted: false,
+  tcpaConsentTimestamp: '',
   textMessagePreference: '',
   dateOfBirth: '',
   gender: '',
