@@ -41,7 +41,7 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     typeof payload.hasCancer === 'boolean' &&
     stringFields.every((field) => typeof payload[field] === 'string' && payload[field]!.length <= 200) &&
     typeof payload.email === 'string' &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) &&
+    (payload.email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) &&
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
     typeof payload.tcpa_consent_granted === 'boolean' &&
