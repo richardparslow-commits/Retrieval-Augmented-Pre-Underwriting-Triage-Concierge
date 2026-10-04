@@ -33,6 +33,21 @@ export function isSmallTalk(text: string): boolean {
   return smallTalkPattern.test(text)
 }
 
+// Reject impossible or future calendar dates (e.g. 13/45/2099) before they are
+// forwarded to the CRM as a date of birth.
+export function isPlausibleDateOfBirth(value: string): boolean {
+  const match = value.match(/^(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})$/)
+  if (!match) return false
+  const [, first, second, third] = match
+  const parts = first.length === 4
+    ? { year: Number(first), month: Number(second), day: Number(third) }
+    : { year: Number(third), month: Number(first), day: Number(second) }
+  if (parts.year < 1900 || parts.month < 1 || parts.month > 12) return false
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
+  if (date.getUTCFullYear() !== parts.year || date.getUTCMonth() !== parts.month - 1 || date.getUTCDate() !== parts.day) return false
+  return date.getTime() <= Date.now()
+}
+
 export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? ''
 }
@@ -66,7 +81,7 @@ export function useUnderwritingState() {
       if (email) next.email = email
       if (phone) next.cellPhone = phone.replace(/[^\d+]/g, '')
       if (name) next.fullName = name
-      if (dob) next.dateOfBirth = dob
+      if (dob && isPlausibleDateOfBirth(dob)) next.dateOfBirth = dob
       if (a1c) next.lastA1C = a1c
       if (height) next.height = height
       if (weight) next.weight = `${weight} lb`

@@ -158,6 +158,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
         if (updated.email !== state.email) corrected.push('email')
         if (updated.cellPhone !== state.cellPhone) corrected.push('phone number')
         if (updated.fullName !== state.fullName) corrected.push('name')
+        if (updated.textMessagePreference !== state.textMessagePreference) corrected.push('text-message preference')
         if (corrected.length > 0) {
           await say(`No problem — I've updated your ${corrected.join(' and ')}.`)
           return
@@ -297,6 +298,12 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
               id="concierge-message"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
               placeholder="Ask a question…"
               rows={1}
               disabled={busy}
