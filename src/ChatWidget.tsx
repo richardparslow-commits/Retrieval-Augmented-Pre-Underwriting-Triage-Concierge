@@ -36,7 +36,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([{
     id: 0,
     role: 'assistant',
-    content: 'Hi! I can explain Term, Whole Life, and IUL in plain language. I can also help organize preliminary information for a licensed professional—no binding quotes or approval guarantees. What would you like to learn?',
+    content: 'Hi there! To get started, what is your name?',
   }])
   const { state, updateFromMessage, requestConsent, grantTcpaConsent, missingFields, skipCurrent } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
