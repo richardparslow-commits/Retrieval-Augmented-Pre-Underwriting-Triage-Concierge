@@ -7,10 +7,11 @@ const policyTypes: UnderwritingState['policyType'][] = ['Term', 'Whole Life', 'I
 
 export const TCPA_DISCLOSURE = 'By providing your phone number, you consent to be contacted by a licensed insurance professional at that number, including by calls and text messages that may use automated technology. Consent is not a condition of purchase, message and data rates may apply, and you can opt out at any time. Type "I AGREE" or select the button below to consent.'
 const phonePattern = /(?:^|\D)(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?:\D|$)/
+const barePhonePattern = /(?:^|\D)(1?[\s.-]?\d{3}[\s.-]\d{4})(?:\D|$)/
 const tcpaAgreement = /^\s*i\s+agree[.!\s]*$/i
 
 export function containsPhone(text: string): boolean {
-  return phonePattern.test(text)
+  return phonePattern.test(text) || barePhonePattern.test(text)
 }
 
 export function isTcpaAgreement(text: string): boolean {
