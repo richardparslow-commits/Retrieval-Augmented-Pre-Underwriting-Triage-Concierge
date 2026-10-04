@@ -3,6 +3,10 @@ interface ChatMessage {
   content: string
 }
 
+// Roles a caller may send. Server-side/system instructions must come only from
+// the route itself, or a client could override the concierge's guardrails.
+const ALLOWED_ROLES = new Set<ChatMessage['role']>(['user', 'assistant'])
+
 const knowledge = [
   {
     terms: ['term', 'temporary', 'renewable'],
@@ -28,6 +32,7 @@ function isChatMessages(value: unknown): value is ChatMessage[] {
     typeof message === 'object' &&
     message !== null &&
     ((message as ChatMessage).role === 'user' || (message as ChatMessage).role === 'assistant') &&
+    ALLOWED_ROLES.has((message as ChatMessage).role) &&
     typeof (message as ChatMessage).content === 'string' &&
     (message as ChatMessage).content.length <= 4_000,
   )
@@ -61,14 +66,19 @@ export async function handleChatRequest(request: Request): Promise<Response> {
   }
 
   const env = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
-  const apiKey = env.OPENAI_API_KEY
   let endpoint: URL
   try {
     endpoint = new URL(env.OPENAI_COMPATIBLE_URL || 'https://api.openai.com/v1/chat/completions')
   } catch {
     return Response.json({ error: 'Chat service is not configured' }, { status: 503 })
   }
-  if (!apiKey || endpoint.protocol !== 'https:') {
+  if (endpoint.protocol !== 'https:') {
+    return Response.json({ error: 'Chat service is not configured' }, { status: 503 })
+  }
+  // Only read the key after the endpoint is validated so a misconfigured
+  // non-HTTPS URL can never receive it.
+  const apiKey = env.OPENAI_API_KEY
+  if (!apiKey) {
     return Response.json({ error: 'Chat service is not configured' }, { status: 503 })
   }
 
