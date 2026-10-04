@@ -93,8 +93,20 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     if (!before.gender && after.gender) captured.push('your gender')
     if (!before.policyType && after.policyType) captured.push(`your interest in ${after.policyType}`)
     if (!before.coverageAmount && after.coverageAmount) captured.push('the coverage amount')
+    if (!before.tobaccoNicotineVaping && after.tobaccoNicotineVaping) captured.push('your tobacco/nicotine use')
+    if (!before.hasDiabetes && after.hasDiabetes) captured.push('your diabetes')
+    if (!before.diabetesType && after.diabetesType) captured.push(`the diabetes type (${after.diabetesType})`)
+    if (!before.diabetesTreatment && after.diabetesTreatment) captured.push('how your diabetes is managed')
+    if (!before.lastA1C && after.lastA1C) captured.push('your last A1C')
+    if (!before.hasCancer && after.hasCancer) captured.push('your cancer history')
+    if (!before.cancerType && after.cancerType) captured.push('the cancer type')
+    if (!before.cancerFreeDuration && after.cancerFreeDuration) captured.push('how long you have been cancer-free')
+    if (!before.textMessagePreference && after.textMessagePreference) captured.push('your text-message preference')
     if (captured.length === 0) return ''
-    return `${greeting} — I've noted ${captured.join(' and ')}.`
+    const noted = captured.length > 2
+      ? `${captured.slice(0, -1).join(', ')}, and ${captured.at(-1)}`
+      : captured.join(' and ')
+    return `${greeting} — I've noted ${noted}.`
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {

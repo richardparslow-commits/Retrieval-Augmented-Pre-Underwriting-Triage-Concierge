@@ -45,7 +45,8 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
     typeof payload.tcpa_consent_granted === 'boolean' &&
-    (payload.cellPhone === '' || (payload.tcpa_consent_granted === true && isIsoTimestamp(payload.consent_timestamp))) &&
+    // Never accept asserted TCPA consent for a phone number we don't hold.
+    (!payload.tcpa_consent_granted || (payload.cellPhone !== '' && isIsoTimestamp(payload.consent_timestamp))) &&
     (payload.policyType === '' || payload.policyType === 'Term' || payload.policyType === 'Whole Life' || payload.policyType === 'IUL') &&
     (payload.textMessagePreference === '' || payload.textMessagePreference === 'yes' || payload.textMessagePreference === 'no')
 }
