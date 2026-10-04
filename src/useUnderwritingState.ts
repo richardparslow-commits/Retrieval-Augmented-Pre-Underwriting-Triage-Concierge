@@ -18,6 +18,21 @@ export function isTcpaAgreement(text: string): boolean {
   return tcpaAgreement.test(text)
 }
 
+// Negations ("I don't have diabetes") and third-party mentions ("my mother had
+// cancer") must not set the applicant's own health flags.
+const negatedMention = /\b(?:no|not|never|without|den(?:y|ies|ied)|don'?t|do not|doesn'?t|does not|didn'?t|did not|haven'?t|have not|hasn'?t|has not)\b[^.!?;]{0,40}$/i
+const thirdPartyMention = /\b(?:my|the|his|her|their)\s+(?:father|mother|dad|mom|brother|sister|sibling|uncle|aunt|grandfather|grandmother|grandpa|grandma|grandparent|parent|parents|husband|wife|spouse|son|daughter|child|children|kids?|cousin|family|relatives?|friend|coworker|co-worker|neighbor|neighbour)\b/i
+
+export function isThirdPartyMention(text: string): boolean {
+  return thirdPartyMention.test(text)
+}
+
+export function isNegatedMention(text: string, keyword: RegExp): boolean {
+  const match = text.match(keyword)
+  if (!match || match.index === undefined) return false
+  return negatedMention.test(text.slice(0, match.index))
+}
+
 const uncertaintyPattern = /\b(not sure|don'?t know|do not know|no idea|maybe|not certain|can'?t remember|unsure)\b/i
 const correctionPattern = /\b(actually|i meant|that'?s wrong|correction|i misspoke|wrong (?:email|number|name))\b/i
 const smallTalkPattern = /^\s*(hi|hello|hey|good (?:morning|afternoon|evening)|thanks|thank you|thx|lol|haha|ok(?:ay)?|cool|great|nice|got it|bye)[\s!.,?]*$/i
@@ -76,7 +91,7 @@ export function useUnderwritingState() {
       const a1c = capture(text, /\b(?:a1c|a1c is|a1c was)\s*(?:of|around|about|is|was|:)?\s*(\d{1,2}(?:\.\d{1,2})?%?)/i)
       const amount = capture(text, /\$\s?([\d,]+(?:\.\d{2})?)/)
       const height = capture(text, /\b((?:\d\s*(?:ft|feet|foot|'|’)\s*\d{1,2}\s*(?:in|inches|")?)|(?:\d\s+\d{1,2})(?=\s*(?:tall|ft|feet|foot|$))|(?:\d{2,3}\s?cm))\b/i)
-      const weightMatch = text.match(/\b(?:(?:weigh(?:t|ing|s)?(?:\s+is)?|i am|i'm)\s+)?(\d{2,3})\s?(?:lb|lbs|pounds)\b|\bweigh(?:ing)?\s+(\d{2,3})\b/i)
+      const weightMatch = text.match(/\b(?:weigh(?:t|ing)?(?:\s+(?:is|of|about|around)|\s*:)?\s+|(?:i am|i'm)\s+(?:about\s+|around\s+)?)(\d{2,3})\s?(?:lb|lbs|pounds)\b|\bweigh(?:ing)?\s+(\d{2,3})\b/i)
       const weight = (weightMatch?.[1] ?? weightMatch?.[2] ?? '').trim()
 
       if (email) next.email = email
@@ -88,8 +103,8 @@ export function useUnderwritingState() {
       if (weight) next.weight = `${weight} lb`
 
       const normalized = text.toLowerCase()
-      if (/\bdiabetes\b/i.test(text)) next.hasDiabetes = true
-      if (/\bcancer\b/i.test(text)) next.hasCancer = true
+      if (/\bdiabetes\b/i.test(text) && !isNegatedMention(text, /\bdiabetes\b/i) && !isThirdPartyMention(text)) next.hasDiabetes = true
+      if (/\bcancer\b/i.test(text) && !isNegatedMention(text, /\bcancer\b/i) && !isThirdPartyMention(text)) next.hasCancer = true
       if (/\b(type\s?1|type one)\b/.test(normalized)) next.diabetesType = 'Type 1'
       if (/\b(type\s?2|type two)\b/.test(normalized)) next.diabetesType = 'Type 2'
       if (/\b(insulin)\b/.test(normalized)) next.diabetesTreatment = 'Insulin'
