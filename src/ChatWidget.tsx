@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
-import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, type ChatMessage } from './ChatAPI'
+import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, sendLeadToProfessional, type ChatMessage } from './ChatAPI'
+import { noopTracker, type AnalyticsTracker } from './analytics'
 import { type UnderwritingState } from './types'
 import { TCPA_DISCLOSURE, containsPhone, expressesUncertainty, firstName, isCorrection, isSmallTalk, isTcpaAgreement, useUnderwritingState } from './useUnderwritingState'
 
@@ -22,7 +23,11 @@ const intakePrompts = [
   (label: string, name: string) => `${name ? `${name}, when` : 'When'} you have a moment, feel free to share ${label}.`,
 ]
 
-export function ChatWidget() {
+interface ChatWidgetProps {
+  trackEvent?: AnalyticsTracker
+}
+
+export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -190,14 +195,8 @@ export function ChatWidget() {
     setHandoff('')
     setSending(true)
     try {
-      const response = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state.cellPhone ? state : { ...state, tcpa_consent_granted: false, consent_timestamp: '' }),
-      })
-      if (!response.ok) throw new Error('Handoff failed')
-      window.dataLayer = window.dataLayer || []
-      window.dataLayer.push({ event: 'pre_underwriting_handoff', policy_type: state.policyType })
+      await sendLeadToProfessional(state)
+      trackEvent({ event: 'pre_underwriting_handoff', policy_type: state.policyType })
       setHandoff('Your preliminary summary was securely sent. Please schedule a conversation with a licensed professional below.')
     } catch {
       setHandoff('The secure handoff is not available right now. You can still schedule a conversation with a licensed professional.')

@@ -1,3 +1,5 @@
+import { type UnderwritingState } from './types'
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -26,4 +28,20 @@ export async function getConciergeReply(messages: ChatMessage[]): Promise<string
     typeof data.reply === 'string'
   ) return data.reply
   throw new Error('Chat service returned an unexpected response')
+}
+
+export function buildLeadPayload(state: UnderwritingState): UnderwritingState {
+  // Never assert TCPA consent for a phone number we don't hold.
+  return state.cellPhone
+    ? state
+    : { ...state, tcpa_consent_granted: false, consent_timestamp: '' }
+}
+
+export async function sendLeadToProfessional(state: UnderwritingState): Promise<void> {
+  const response = await fetch('/api/lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(buildLeadPayload(state)),
+  })
+  if (!response.ok) throw new Error('Handoff failed')
 }

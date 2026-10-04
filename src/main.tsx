@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import { gtmTracker } from './analytics'
 import { ChatWidget } from './ChatWidget'
 import { ErrorBoundary } from './ErrorBoundary'
 import './styles.css'
@@ -13,7 +14,7 @@ function mountWidget() {
   if (mountPoint.dataset.conciergeMounted) return
   mountPoint.dataset.conciergeMounted = 'true'
   createRoot(mountPoint).render(
-    <ErrorBoundary><ChatWidget /></ErrorBoundary>,
+    <ErrorBoundary><ChatWidget trackEvent={gtmTracker} /></ErrorBoundary>,
   )
 }
 
