@@ -44,9 +44,10 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     (payload.email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) &&
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
+    (payload.email !== '' || payload.cellPhone.trim() !== '') &&
     typeof payload.tcpa_consent_granted === 'boolean' &&
     // Never accept asserted TCPA consent for a phone number we don't hold.
-    (!payload.tcpa_consent_granted || (payload.cellPhone !== '' && isIsoTimestamp(payload.consent_timestamp))) &&
+    (!payload.tcpa_consent_granted || (payload.cellPhone.trim() !== '' && isIsoTimestamp(payload.consent_timestamp))) &&
     (payload.policyType === '' || payload.policyType === 'Term' || payload.policyType === 'Whole Life' || payload.policyType === 'IUL') &&
     (payload.textMessagePreference === '' || payload.textMessagePreference === 'yes' || payload.textMessagePreference === 'no')
 }
@@ -107,6 +108,7 @@ export async function handleWebhookRequest(request: Request): Promise<Response> 
         receivedAt: new Date().toISOString(),
       }),
       redirect: 'error',
+      signal: AbortSignal.timeout(20_000),
     })
     if (!result.ok) return Response.json({ error: 'CRM handoff failed' }, { status: 502 })
     return Response.json({ ok: true })
