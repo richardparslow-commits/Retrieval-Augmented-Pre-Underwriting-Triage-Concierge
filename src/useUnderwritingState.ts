@@ -153,7 +153,7 @@ export function useUnderwritingState() {
   }, [])
 
   const grantTcpaConsent = useCallback(() => {
-    if (tcpaGranted.current) return
+    if (!latest.current.consented || tcpaGranted.current) return
     tcpaGranted.current = true
     const next = { ...latest.current, tcpa_consent_granted: true, consent_timestamp: new Date().toISOString() }
     latest.current = next
