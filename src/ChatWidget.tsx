@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowUp, CalendarDays, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
-import { getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, sendLeadToProfessional, type ChatMessage } from './ChatAPI'
+import { MAX_CHAT_MESSAGE_LENGTH, getConciergeReply, isAccuracyBoundary, isBindingQuoteRequest, sendLeadToProfessional, type ChatMessage } from './ChatAPI'
 import { noopTracker, type AnalyticsTracker } from './analytics'
 import { type UnderwritingState } from './types'
 import { TCPA_DISCLOSURE, containsPhone, expressesUncertainty, firstName, isCorrection, isSmallTalk, isTcpaAgreement, useUnderwritingState } from './useUnderwritingState'
@@ -330,6 +330,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
                   event.currentTarget.form?.requestSubmit()
                 }
               }}
+              maxLength={MAX_CHAT_MESSAGE_LENGTH}
               placeholder="Ask a question…"
               rows={1}
               disabled={busy}
