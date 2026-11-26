@@ -44,6 +44,8 @@ test('rejects missing contact and missing consent before CRM handoff', async (t)
     tcpa_consent_granted: true,
     consent_timestamp: new Date().toISOString(),
   })).status, 400)
+  assert.equal((await submit({ cellPhone: 'not-a-number' })).status, 400)
+  assert.equal((await submit({ email: 'lead@example.test', cellPhone: '123' })).status, 400)
   assert.equal(fetch.mock.callCount(), 0)
 })
 
@@ -59,9 +61,24 @@ test('sends an email-only lead with a bounded CRM request', async (t) => {
     else process.env.CRM_WEBHOOK_SECRET = originalSecret
   })
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }))
-  assert.equal((await submit({ email: 'lead@example.test' })).status, 200)
+  assert.equal((await submit({
+    email: 'lead@example.test',
+    diabetesType: 'Synthetic past answer',
+    cancerType: 'Synthetic past answer',
+  })).status, 200)
   assert.equal(fetch.mock.callCount(), 1)
   const [, options] = fetch.mock.calls[0].arguments
   assert.ok(options.signal instanceof AbortSignal)
-  assert.equal(JSON.parse(options.body).email, 'lead@example.test')
+  const outbound = JSON.parse(options.body)
+  assert.equal(outbound.email, 'lead@example.test')
+  assert.equal(outbound.diabetesType, '')
+  assert.equal(outbound.cancerType, '')
+
+  assert.equal((await submit({
+    cellPhone: '+1 (512) 555-0100',
+    hasDiabetes: true,
+    diabetesType: 'Synthetic current answer',
+  })).status, 200)
+  const phoneLead = JSON.parse(fetch.mock.calls[1].arguments[1].body)
+  assert.equal(phoneLead.diabetesType, 'Synthetic current answer')
 })
