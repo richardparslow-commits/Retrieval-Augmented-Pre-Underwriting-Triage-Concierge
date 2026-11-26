@@ -81,6 +81,25 @@ export function useUnderwritingState() {
   // can diff what a message changed without waiting for React to re-render.
   const latest = useRef(state)
 
+  const revokeConsentForReplacementPhone = useCallback((text: string): boolean => {
+    const previous = latest.current
+    const replacement = capture(text, phonePattern)
+    const localDigits = (value: string) => value.replace(/\D/g, '').slice(-10)
+    if (!previous.cellPhone || !replacement || localDigits(previous.cellPhone) === localDigits(replacement)) return false
+
+    tcpaGranted.current = false
+    const next: UnderwritingState = {
+      ...previous,
+      cellPhone: '',
+      tcpa_consent_granted: false,
+      consent_timestamp: '',
+      textMessagePreference: '',
+    }
+    latest.current = next
+    setState(next)
+    return true
+  }, [])
+
   const collect = useCallback((text: string): UnderwritingState => {
     const next = { ...latest.current }
     {
@@ -192,5 +211,5 @@ export function useUnderwritingState() {
     if (key) setSkippedFields((current) => new Set(current).add(key))
   }, [pendingFields])
 
-  return { state, updateFromMessage, requestConsent, grantTcpaConsent, missingFields, skipCurrent }
+  return { state, updateFromMessage, requestConsent, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent }
 }
