@@ -34,14 +34,15 @@ function isChatMessages(value: unknown): value is ChatMessage[] {
     ((message as ChatMessage).role === 'user' || (message as ChatMessage).role === 'assistant') &&
     ALLOWED_ROLES.has((message as ChatMessage).role) &&
     typeof (message as ChatMessage).content === 'string' &&
-    (message as ChatMessage).content.length <= 4_000,
+    (message as ChatMessage).content.length <= 4_000 &&
+    (message as ChatMessage).content.trim().length > 0,
   )
 }
 
 function retrieveContext(question: string): string {
-  const query = question.toLowerCase()
+  const query = ` ${question.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
   return knowledge
-    .map((entry) => ({ ...entry, score: entry.terms.filter((term) => query.includes(term)).length }))
+    .map((entry) => ({ ...entry, score: entry.terms.filter((term) => query.includes(` ${term} `)).length }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score)
     .slice(0, 2)
@@ -125,7 +126,8 @@ export async function handleChatRequest(request: Request): Promise<Response> {
       typeof data.choices[0].message === 'object' &&
       data.choices[0].message !== null &&
       'content' in data.choices[0].message &&
-      typeof data.choices[0].message.content === 'string'
+      typeof data.choices[0].message.content === 'string' &&
+      data.choices[0].message.content.trim().length > 0
     ) return Response.json({ reply: data.choices[0].message.content })
     return Response.json({ error: 'Chat service returned an unexpected response' }, { status: 502 })
   } catch {
