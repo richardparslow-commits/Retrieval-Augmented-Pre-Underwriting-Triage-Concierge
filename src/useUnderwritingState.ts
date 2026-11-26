@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { initialUnderwritingState, type UnderwritingState } from './types'
 
-const affirmative = /\b(yes|yep|sure|okay|ok|go ahead|that's fine|that is fine)\b/i
-const negative = /\b(no|no thanks|not now|rather not)\b/i
+const affirmative = /^(?:yes(?:,? please)?|yep|sure|okay|ok|go ahead|that['’]s fine|that is fine)[.!]*$/i
+const negative = /^(?:no(?:,? thanks)?|not now|rather not)[.!]*$/i
 const policyTypes: UnderwritingState['policyType'][] = ['Term', 'Whole Life', 'IUL']
 
 export const TCPA_DISCLOSURE = 'By providing your phone number, you consent to be contacted by a licensed insurance professional at that number, including by calls and text messages that may use automated technology. Consent is not a condition of purchase, message and data rates may apply, and you can opt out at any time. Type "I AGREE" or select the button below to consent.'
@@ -164,16 +164,21 @@ export function useUnderwritingState() {
     consentPending.current = true
   }, [])
 
-  const updateFromMessage = useCallback((text: string): { result: 'accepted' | 'declined' | null; state: UnderwritingState } => {
+  const updateFromMessage = useCallback((text: string): { result: 'accepted' | 'declined' | 'pending' | null; state: UnderwritingState } => {
     if (consentPending.current) {
-      consentPending.current = false
-      if (negative.test(text)) return { result: 'declined', state: latest.current }
-      if (affirmative.test(text)) {
+      const reply = text.trim()
+      if (negative.test(reply)) {
+        consentPending.current = false
+        return { result: 'declined', state: latest.current }
+      }
+      if (affirmative.test(reply)) {
+        consentPending.current = false
         const consentedState = { ...latest.current, consented: true }
         latest.current = consentedState
         setState(consentedState)
-        return { result: 'accepted', state: collect(text) }
+        return { result: 'accepted', state: consentedState }
       }
+      return { result: 'pending', state: latest.current }
     }
     if (latest.current.consented) return { result: null, state: collect(text) }
     return { result: null, state: latest.current }

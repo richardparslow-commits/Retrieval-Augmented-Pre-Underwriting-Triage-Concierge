@@ -163,6 +163,10 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
       await say('No problem. We can keep this educational and you do not need to share personal information.')
       return
     }
+    if (consentResponse === 'pending') {
+      await say('Please reply Yes to start optional intake or No to continue with general information.')
+      return
+    }
     if (isBindingQuoteRequest(text)) {
       await say('I can’t provide a binding quote or guarantee a rate or underwriting class. Only an insurer can determine that after reviewing an application. A licensed professional can help compare options.')
       return
