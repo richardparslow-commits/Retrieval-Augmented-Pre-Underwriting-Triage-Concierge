@@ -1,3 +1,5 @@
+import { readBoundedJson } from './readBoundedJson.ts'
+
 export interface LeadPayload {
   consented: true
   tcpa_consent_granted: boolean
@@ -60,15 +62,9 @@ function isLeadPayload(value: unknown): value is LeadPayload {
 export async function handleWebhookRequest(request: Request): Promise<Response> {
   if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 })
 
-  const raw = await request.text()
-  if (raw.length > 16_384) return Response.json({ error: 'Payload too large' }, { status: 413 })
-
-  let payload: unknown
-  try {
-    payload = JSON.parse(raw)
-  } catch {
-    return Response.json({ error: 'Invalid JSON payload' }, { status: 400 })
-  }
+  const parsed = await readBoundedJson(request, 16_384)
+  if (!parsed.ok) return parsed.response
+  const payload = parsed.value
   if (!isLeadPayload(payload)) return Response.json({ error: 'Valid consent and contact information are required' }, { status: 400 })
 
   const env = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
