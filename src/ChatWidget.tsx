@@ -205,10 +205,8 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
 
   async function sendToProfessional() {
     if (sending) return
-    // Don't deliver an empty record to the CRM; require at least one identity
-    // or contact detail so the handoff is actionable for the professional.
-    if (!state.fullName && !state.email && !state.cellPhone) {
-      setHandoff('Please share at least your name, email, or cell phone before sending your summary.')
+    if (!state.email.trim() && !state.cellPhone.trim()) {
+      setHandoff('Please share an email address or cell phone before sending your summary.')
       return
     }
     setHandoff('')
