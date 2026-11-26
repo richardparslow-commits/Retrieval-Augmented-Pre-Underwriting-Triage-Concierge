@@ -36,6 +36,10 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     'height', 'weight', 'tobaccoNicotineVaping', 'policyType', 'coverageAmount',
     'diabetesType', 'diabetesTreatment', 'lastA1C', 'cancerType', 'cancerFreeDuration', 'consent_timestamp',
   ]
+  const phone = typeof payload.cellPhone === 'string' ? payload.cellPhone.trim() : ''
+  const validPhone = /^(?:\+?1)?[\d(). -]+$/.test(phone) &&
+    /^1?\d{10}$/.test(phone.replace(/\D/g, ''))
+
   return payload.consented === true &&
     typeof payload.hasDiabetes === 'boolean' &&
     typeof payload.hasCancer === 'boolean' &&
@@ -44,10 +48,11 @@ function isLeadPayload(value: unknown): value is LeadPayload {
     (payload.email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) &&
     typeof payload.cellPhone === 'string' &&
     payload.cellPhone.length <= 30 &&
-    (payload.email !== '' || payload.cellPhone.trim() !== '') &&
+    (phone === '' || validPhone) &&
+    (payload.email !== '' || validPhone) &&
     typeof payload.tcpa_consent_granted === 'boolean' &&
     // Never accept asserted TCPA consent for a phone number we don't hold.
-    (!payload.tcpa_consent_granted || (payload.cellPhone.trim() !== '' && isIsoTimestamp(payload.consent_timestamp))) &&
+    (!payload.tcpa_consent_granted || (validPhone && isIsoTimestamp(payload.consent_timestamp))) &&
     (payload.policyType === '' || payload.policyType === 'Term' || payload.policyType === 'Whole Life' || payload.policyType === 'IUL') &&
     (payload.textMessagePreference === '' || payload.textMessagePreference === 'yes' || payload.textMessagePreference === 'no')
 }
@@ -99,12 +104,12 @@ export async function handleWebhookRequest(request: Request): Promise<Response> 
         policyType: payload.policyType,
         coverageAmount: payload.coverageAmount,
         hasDiabetes: payload.hasDiabetes,
-        diabetesType: payload.diabetesType,
-        diabetesTreatment: payload.diabetesTreatment,
-        lastA1C: payload.lastA1C,
+        diabetesType: payload.hasDiabetes ? payload.diabetesType : '',
+        diabetesTreatment: payload.hasDiabetes ? payload.diabetesTreatment : '',
+        lastA1C: payload.hasDiabetes ? payload.lastA1C : '',
         hasCancer: payload.hasCancer,
-        cancerType: payload.cancerType,
-        cancerFreeDuration: payload.cancerFreeDuration,
+        cancerType: payload.hasCancer ? payload.cancerType : '',
+        cancerFreeDuration: payload.hasCancer ? payload.cancerFreeDuration : '',
         receivedAt: new Date().toISOString(),
       }),
       redirect: 'error',
