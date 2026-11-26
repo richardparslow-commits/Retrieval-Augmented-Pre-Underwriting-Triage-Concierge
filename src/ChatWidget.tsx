@@ -9,6 +9,12 @@ interface DisplayMessage extends ChatMessage {
   id: number
 }
 
+const initialMessage: DisplayMessage = {
+  id: 0,
+  role: 'assistant',
+  content: 'Hi there! To get started, what is your name?',
+}
+
 const schedulingUrl = import.meta.env.VITE_SCHEDULING_URL || 'https://calendly.com/'
 
 // Match a person's typing rhythm: a brief, slightly varied pause before replying.
@@ -33,12 +39,8 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   const [busy, setBusy] = useState(false)
   const [sending, setSending] = useState(false)
   const [handoff, setHandoff] = useState('')
-  const [messages, setMessages] = useState<DisplayMessage[]>([{
-    id: 0,
-    role: 'assistant',
-    content: 'Hi there! To get started, what is your name?',
-  }])
-  const { state, updateFromMessage, requestConsent, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent } = useUnderwritingState()
+  const [messages, setMessages] = useState<DisplayMessage[]>([initialMessage])
+  const { state, updateFromMessage, requestConsent, resetIntake, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const tcpaPending = useRef(false)
@@ -225,6 +227,16 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     }
   }
 
+  function clearIntake() {
+    if (busy || sending) return
+    resetIntake()
+    tcpaPending.current = false
+    educationHistory.current = [{ role: initialMessage.role, content: initialMessage.content }]
+    setMessages([initialMessage])
+    setDraft('')
+    setHandoff('')
+  }
+
   async function sendToProfessional() {
     if (sending) return
     // Don't deliver an empty record to the CRM; require at least one identity
@@ -285,6 +297,16 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
               >
                 <LoaderCircle className="animate-spin" size={18} /> Thinking…
               </div>
+            )}
+            {state.consented && (
+              <button
+                type="button"
+                className="self-start px-1 text-xs text-brand-primary underline"
+                onClick={clearIntake}
+                disabled={busy || sending}
+              >
+                Stop intake and clear this chat
+              </button>
             )}
             {state.consented && missingFields.length > 0 && (
               <div className="flex items-center justify-between px-1 text-xs text-brand-accent">
