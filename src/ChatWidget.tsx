@@ -38,7 +38,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     role: 'assistant',
     content: 'Hi there! To get started, what is your name?',
   }])
-  const { state, updateFromMessage, requestConsent, grantTcpaConsent, missingFields, skipCurrent } = useUnderwritingState()
+  const { state, updateFromMessage, requestConsent, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent } = useUnderwritingState()
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const tcpaPending = useRef(false)
@@ -115,6 +115,12 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     const text = draft.trim()
     if (!text || busy) return
     setDraft('')
+    if (revokeConsentForReplacementPhone(text)) {
+      tcpaPending.current = true
+      append('user', '[Replacement phone number withheld]')
+      await say('I cleared the previous phone number and its consent. Please review the disclosure and agree before sharing the replacement.', TCPA_DISCLOSURE)
+      return
+    }
     const withholdPhone = !state.tcpa_consent_granted && containsPhone(text)
     append('user', withholdPhone ? '[Phone number withheld]' : text)
     if (!state.tcpa_consent_granted) {
