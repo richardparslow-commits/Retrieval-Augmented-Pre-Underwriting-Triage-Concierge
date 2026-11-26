@@ -160,6 +160,14 @@ export function useUnderwritingState() {
     setState(next)
   }, [])
 
+  const resetIntake = useCallback(() => {
+    consentPending.current = false
+    tcpaGranted.current = false
+    latest.current = initialUnderwritingState
+    setState(initialUnderwritingState)
+    setSkippedFields(new Set())
+  }, [])
+
   const requestConsent = useCallback(() => {
     consentPending.current = true
   }, [])
@@ -216,5 +224,5 @@ export function useUnderwritingState() {
     if (key) setSkippedFields((current) => new Set(current).add(key))
   }, [pendingFields])
 
-  return { state, updateFromMessage, requestConsent, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent }
+  return { state, updateFromMessage, requestConsent, resetIntake, grantTcpaConsent, revokeConsentForReplacementPhone, missingFields, skipCurrent }
 }
