@@ -42,6 +42,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const tcpaPending = useRef(false)
+  const educationHistory = useRef<ChatMessage[]>([{ role: 'assistant', content: messages[0].content }])
   const name = firstName(state.fullName)
   const needsTcpa = missingFields[0] === 'your cell phone number' && !state.tcpa_consent_granted
   const summary = [
@@ -114,7 +115,8 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     const text = draft.trim()
     if (!text || busy) return
     setDraft('')
-    append('user', text)
+    const withholdPhone = !state.tcpa_consent_granted && containsPhone(text)
+    append('user', withholdPhone ? '[Phone number withheld]' : text)
     if (!state.tcpa_consent_granted) {
       // The disclosure invites typing "I AGREE" and stays visible while the phone
       // step is next, so honor it even if no phone number was volunteered first.
@@ -131,7 +133,7 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
         await say(`No problem${name ? `, ${name}` : ''} — I've noted that.`)
         return
       }
-      if (containsPhone(text)) {
+      if (withholdPhone) {
         tcpaPending.current = true
         await say('I can’t save that phone number yet, so I discarded it.', `${TCPA_DISCLOSURE} Afterward, please share your number again.`)
         return
@@ -188,13 +190,19 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
           : 'Happy to help! Your preliminary summary is ready whenever you’d like to send it.')
         return
       }
+      const prompt = missingFields[0]
+      await say(prompt
+        ? intakePrompts[0](prompt, name)
+        : 'Your preliminary summary is ready to review. You can send it or schedule a conversation with a licensed professional.')
+      return
     }
 
     setBusy(true)
-    const contextMessages = [...messages, { id: nextId.current, role: 'user' as const, content: text }]
-      .map(({ role, content }) => ({ role, content }))
+    // Only educational exchanges belong in the model transcript.
+    const contextMessages: ChatMessage[] = [...educationHistory.current.slice(-19), { role: 'user', content: text }]
     try {
       const reply = await getConciergeReply(contextMessages)
+      educationHistory.current = [...contextMessages, { role: 'assistant', content: reply }]
       append('assistant', reply)
     } catch {
       append('assistant', 'I’m having trouble reaching the chat service. I can still share general information: Term coverage lasts for a selected period; Whole Life and IUL are forms of permanent coverage with different policy features. A licensed professional can explain what may fit your needs.')
