@@ -1,3 +1,5 @@
+import { readBoundedJson } from './readBoundedJson.ts'
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -52,15 +54,9 @@ function retrieveContext(question: string): string {
 
 export async function handleChatRequest(request: Request): Promise<Response> {
   if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 })
-  const raw = await request.text()
-  if (raw.length > 32_768) return Response.json({ error: 'Payload too large' }, { status: 413 })
-
-  let body: unknown
-  try {
-    body = JSON.parse(raw)
-  } catch {
-    return Response.json({ error: 'Invalid JSON payload' }, { status: 400 })
-  }
+  const parsed = await readBoundedJson(request, 32_768)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.value
   const messages = typeof body === 'object' && body !== null && 'messages' in body ? body.messages : undefined
   if (!isChatMessages(messages) || messages.at(-1)?.role !== 'user') {
     return Response.json({ error: 'Valid conversation messages are required' }, { status: 400 })
