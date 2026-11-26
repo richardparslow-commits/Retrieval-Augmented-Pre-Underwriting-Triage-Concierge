@@ -123,6 +123,10 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
     }
     const withholdPhone = !state.tcpa_consent_granted && containsPhone(text)
     append('user', withholdPhone ? '[Phone number withheld]' : text)
+    if (!state.consented && (withholdPhone || isTcpaAgreement(text))) {
+      await say('Phone contact consent is available during optional intake. Please keep phone numbers out of educational chat.')
+      return
+    }
     if (!state.tcpa_consent_granted) {
       // The disclosure invites typing "I AGREE" and stays visible while the phone
       // step is next, so honor it even if no phone number was volunteered first.
