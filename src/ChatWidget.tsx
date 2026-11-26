@@ -32,6 +32,8 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const handoffLocked = useRef(false)
   const [handoff, setHandoff] = useState('')
   const [messages, setMessages] = useState<DisplayMessage[]>([{
     id: 0,
@@ -204,21 +206,30 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
   }
 
   async function sendToProfessional() {
-    if (sending) return
+    if (handoffLocked.current) return
     if (!state.email.trim() && !state.cellPhone.trim()) {
       setHandoff('Please share an email address or cell phone before sending your summary.')
       return
     }
+    handoffLocked.current = true
     setHandoff('')
     setSending(true)
     try {
       await sendLeadToProfessional(state)
-      trackEvent({ event: 'pre_underwriting_handoff', policy_type: state.policyType })
+      setSent(true)
       setHandoff('Your preliminary summary was securely sent. Please schedule a conversation with a licensed professional below.')
     } catch {
-      setHandoff('The secure handoff is not available right now. You can still schedule a conversation with a licensed professional.')
+      handoffLocked.current = false
+      setHandoff('We could not confirm that your summary was sent. You can try again or schedule a conversation with a licensed professional.')
+      return
     } finally {
       setSending(false)
+    }
+
+    try {
+      trackEvent({ event: 'pre_underwriting_handoff', policy_type: state.policyType })
+    } catch {
+      // Analytics failures must not change the result of a completed handoff.
     }
   }
 
@@ -294,9 +305,9 @@ export function ChatWidget({ trackEvent = noopTracker }: ChatWidgetProps) {
                 <button
                   className="cursor-pointer rounded-lg border-0 bg-brand-primary px-3 py-2.5 text-white transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_#18211655]"
                   onClick={sendToProfessional}
-                  disabled={sending}
+                  disabled={sending || sent}
                 >
-                  {sending ? 'Sending…' : 'Send summary securely'}
+                  {sent ? 'Summary sent' : sending ? 'Sending…' : 'Send summary securely'}
                 </button>
                 {handoff && <p role="status" className="m-0 text-[13px] leading-[1.5]">{handoff}</p>}
                 <a className="flex items-center gap-[7px] text-[13px] font-semibold text-brand-primary underline" href={schedulingUrl} target="_blank" rel="noreferrer">
