@@ -8,6 +8,9 @@ permissions:
 
 jobs:
   coverage:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,7 +28,7 @@ jobs:
       - name: Upload route coverage
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           files: coverage/lcov.info
           disable_search: true
           flags: concierge-routes
